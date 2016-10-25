@@ -12,18 +12,25 @@ const char* password = "0988807067";
 const char* clientId = "MotyLight1";
 // use public MQTT broker
 //const char* mqttServer = "broker.hivemq.com";
-const char* mqttServer = "192.168.1.110";
-const char* mqttUsername = "<MQTT_BROKER_USERNAME>";
-const char* mqttPassword = "<MQTT_BROKER_PASSWORD>";
+//const char* mqttServer = "192.168.1.110";
+const char* mqttServer = "m20.cloudmqtt.com";
+const int mqttPort = 15060;
+// Username và password để kết nối đến MQTT server nếu server có
+// bật chế độ xác thực trên MQTT server
+// Nếu không dùng thì cứ để vậy
+//const char* mqttUsername = "<MQTT_BROKER_USERNAME>";
+//const char* mqttPassword = "<MQTT_BROKER_PASSWORD>";
+const char* mqttUsername = "jbfptrgk";
+const char* mqttPassword = "hRZXXsuJBg4R";
 
-const char* lightStatusTopic = "/MotyLight1/LightStatus";
-const char* ipInfoTopic = "/MotyLight1/IPInfo";
+const char* lightStatusTopic = "/easytech.vn/MotyLight1/LightStatus";
+const char* ipInfoTopic = "/easytech.vn/MotyLight1/IPInfo";
 
 // used for smoothing technique to read light sensor value
 // please refer example from menu File\Examples\03.Analog\Smoothing
 const int numReadings = 5;
-int lightThreshold = 310;
-int lightOnDuration = 10000; // max idle time for light without motion detected ~ 30 seconds
+int lightThreshold = 200;
+int lightOnDuration = 15000; // max idle time for light without motion detected ~ 30 seconds
 
 const unsigned long reconnectInterval = 60000; // try to reconnect to wifi/broker every 3 mins if disconnected
 unsigned long lastReconnect = 0; // last time attempt to reconnect
@@ -35,7 +42,7 @@ int lightSensorValue = 0;       // the average light sensor value
 
 const byte relayPin = D1; 
 const byte buttonPin = D5;
-const byte pirPin = D2;
+const byte pirPin = D7;
 boolean relayOn = false; // light status, false = light off, true = light on
 
 unsigned long lastMotionDetected = 0; // last time motion is detected
@@ -55,7 +62,7 @@ void setup() {
     pinMode(buttonPin, INPUT);
     pinMode(relayPin, OUTPUT);
   
-    digitalWrite(relayPin, HIGH); // turn off relay by default
+    digitalWrite(relayPin, LOW); // turn off relay by default
     relayOn = false;
   
     // initialize all the light sensor readings
@@ -63,6 +70,7 @@ void setup() {
         readings[i] = 0;
 
     // read eeprom for ssid and pass
+    /*
     EEPROM.begin(512);
     Serial.println("Reading ligh threshold from EEPROM");
     String lightThresholdStr;
@@ -75,8 +83,10 @@ void setup() {
     if (lightThresholdStr.length() > 0)
     {
       lightThreshold = lightThresholdStr.toInt();
+      Serial.println(lightThreshold);
     }
- 
+    */
+    /*
     Serial.println("Reading duration from EEPROM");
     String lightOnDurationStr = "";
     for (int i = 32; i < 96; ++i)
@@ -88,11 +98,13 @@ void setup() {
     if (lightOnDurationStr.length() > 0)
     {
       lightOnDuration = lightOnDurationStr.toInt()*1000;
+      Serial.println(lightOnDuration);
     } 
+    */
 
     setup_wifi();
 
-    client.setServer(mqttServer, 1883);
+    client.setServer(mqttServer, mqttPort);
     client.setCallback(onMessageReceived);
 
     launchWeb();
@@ -135,19 +147,19 @@ void loop() {
   int motionDetected = digitalRead(pirPin);
 
   if (motionDetected) {
-    //Serial.println("Motion detected");
+    Serial.println("Motion detected");
     if (lightSensorValue < lightThreshold) { // if the light is darker than limit
       if (!relayOn) { // light is currently off, then turn it on
         Serial.println("Motion detected. It's dark so I am turning light on");
         relayOn = true;
-        digitalWrite(relayPin, LOW);
+        digitalWrite(relayPin, HIGH);
         Serial.println("Sending status update to broker");
         char status [2];
         sprintf(status, "%d", 1);
         client.publish(lightStatusTopic, status);
       }
-      lastMotionDetected = millis(); //save last time motion is detected
-    }    
+    }  
+    lastMotionDetected = millis(); //save last time motion is detected  
   }
   
   if (relayOn) { // we need to check to turn off light if no motion detected after some time
@@ -155,7 +167,7 @@ void loop() {
     if (current - lastMotionDetected > lightOnDuration) {
       Serial.println("No motion detected long time. I am turning light off");
       relayOn = false;
-      digitalWrite(relayPin, HIGH);
+      digitalWrite(relayPin, LOW);
       Serial.println("Sending status update to broker");
       char status [2];
       sprintf(status, "%d", 0);
@@ -168,8 +180,10 @@ void loop() {
 }
 
 void setup_wifi() {
+  // Do cảm biến chuyển động PIR bị nhiễu khi sử dụng gần Esp8266 nên ta cần
+  // phải giảm mức tín hiệu của esp8266 để tránh nhiễu cho PIR
   //WiFi.setPhyMode(WIFI_PHY_MODE_11G); 
-  WiFi.setOutputPower(8);
+  WiFi.setOutputPower(7);
   // We start by connecting to a WiFi network
   Serial.print("Connecting to "); Serial.println(ssid);
 
